@@ -4833,6 +4833,12 @@ pub enum Statement {
     /// ```
     /// [PostgreSQL](https://www.postgresql.org/docs/current/sql-reset.html)
     Reset(ResetStatement),
+    /// Go (MsSql)
+    ///
+    /// GO is not a Transact-SQL statement; it is a command recognized by various tools as a batch delimiter
+    ///
+    /// See: <https://learn.microsoft.com/en-us/sql/t-sql/language-elements/sql-server-utilities-statements-go>
+    Go(GoStatement),
 }
 
 impl From<Analyze> for Statement {
@@ -6247,6 +6253,7 @@ impl fmt::Display for Statement {
             Statement::Throw(s) => write!(f, "{s}"),
             Statement::Print(s) => write!(f, "{s}"),
             Statement::WaitFor(s) => write!(f, "{s}"),
+            Statement::Go(s) => write!(f, "{s}"),
             Statement::Return(r) => write!(f, "{r}"),
             Statement::List(command) => write!(f, "LIST {command}"),
             Statement::Remove(command) => write!(f, "REMOVE {command}"),
@@ -11543,6 +11550,27 @@ impl fmt::Display for CreateTableLikeDefaults {
         match self {
             CreateTableLikeDefaults::Including => write!(f, "INCLUDING DEFAULTS"),
             CreateTableLikeDefaults::Excluding => write!(f, "EXCLUDING DEFAULTS"),
+        }
+    }
+}
+
+/// Represents a `GO` statement.
+///
+/// [MsSql](https://learn.microsoft.com/en-us/sql/t-sql/language-elements/sql-server-utilities-statements-go)
+#[derive(Debug, Clone, PartialEq, PartialOrd, Eq, Ord, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "visitor", derive(Visit, VisitMut))]
+pub struct GoStatement {
+    /// How many times the batch should be executed, if specified (e.g., `GO 10`).
+    pub count: Option<u64>,
+}
+
+impl Display for GoStatement {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if let Some(count) = self.count {
+            write!(f, "GO {count}")
+        } else {
+            write!(f, "GO")
         }
     }
 }
