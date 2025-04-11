@@ -4565,9 +4565,9 @@ impl<'a> Parser<'a> {
         } else if self.parse_keyword(Keyword::FUNCTION) {
             self.parse_create_function(or_alter, or_replace, temporary)
         } else if self.parse_keyword(Keyword::TRIGGER) {
-            self.parse_create_trigger(or_replace, false)
+            self.parse_create_trigger(or_alter, or_replace, false)
         } else if self.parse_keywords(&[Keyword::CONSTRAINT, Keyword::TRIGGER]) {
-            self.parse_create_trigger(or_replace, true)
+            self.parse_create_trigger(or_alter, or_replace, true)
         } else if self.parse_keyword(Keyword::MACRO) {
             self.parse_create_macro(or_replace, temporary)
         } else if self.parse_keyword(Keyword::SECRET) {
@@ -5268,6 +5268,7 @@ impl<'a> Parser<'a> {
 
     pub fn parse_create_trigger(
         &mut self,
+        or_alter: bool,
         or_replace: bool,
         is_constraint: bool,
     ) -> Result<Statement, ParserError> {
@@ -5277,7 +5278,7 @@ impl<'a> Parser<'a> {
         }
 
         if dialect_of!(self is MsSqlDialect) {
-            return self.parse_mssql_create_trigger(or_replace, is_constraint);
+            return self.parse_mssql_create_trigger(or_alter, or_replace, is_constraint);
         }
 
         let name = self.parse_object_name(false)?;
@@ -5321,6 +5322,7 @@ impl<'a> Parser<'a> {
         let exec_body = self.parse_trigger_exec_body()?;
 
         Ok(Statement::CreateTrigger {
+            or_alter,
             or_replace,
             is_constraint,
             name,
@@ -5343,6 +5345,7 @@ impl<'a> Parser<'a> {
     /// [MsSql]: https://learn.microsoft.com/en-us/sql/t-sql/statements/create-trigger-transact-sql
     pub fn parse_mssql_create_trigger(
         &mut self,
+        or_alter: bool,
         or_replace: bool,
         is_constraint: bool,
     ) -> Result<Statement, ParserError> {
@@ -5373,6 +5376,7 @@ impl<'a> Parser<'a> {
         };
 
         Ok(Statement::CreateTrigger {
+            or_alter,
             or_replace,
             is_constraint,
             name,

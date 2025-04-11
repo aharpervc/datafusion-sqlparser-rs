@@ -3521,6 +3521,7 @@ fn parse_create_trigger() {
     assert_eq!(
         create_stmt,
         Statement::CreateTrigger {
+            or_alter: false,
             or_replace: false,
             is_constraint: false,
             name: ObjectName::from(vec![Ident::new("emp_stamp")]),
