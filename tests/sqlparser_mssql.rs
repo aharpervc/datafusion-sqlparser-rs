@@ -2126,6 +2126,94 @@ fn parse_mssql_merge_with_output() {
 }
 
 #[test]
+fn parse_create_trigger() {
+    let create_trigger = "\
+        CREATE TRIGGER reminder1 \
+        ON Sales.Customer \
+        AFTER INSERT, UPDATE \
+        AS RAISERROR('Notify Customer Relations', 16, 10);\
+    ";
+    let create_stmt = ms().verified_stmt(create_trigger);
+    assert_eq!(
+        create_stmt,
+        Statement::CreateTrigger {
+            or_replace: false,
+            is_constraint: false,
+            name: ObjectName::from(vec![Ident::new("reminder1")]),
+            period: TriggerPeriod::After,
+            events: vec![TriggerEvent::Insert, TriggerEvent::Update(vec![]),],
+            table_name: ObjectName::from(vec![Ident::new("Sales"), Ident::new("Customer")]),
+            referenced_table_name: None,
+            referencing: vec![],
+            trigger_object: TriggerObject::Statement,
+            include_each: false,
+            condition: None,
+            exec_body: None,
+            statements: Some(BeginEndStatements {
+                begin_token: AttachedToken::empty(),
+                statements: vec![Statement::RaisError {
+                    message: Box::new(Expr::Value(
+                        (Value::SingleQuotedString("Notify Customer Relations".to_string()))
+                            .with_empty_span()
+                    )),
+                    severity: Box::new(Expr::Value(
+                        (Value::Number("16".parse().unwrap(), false)).with_empty_span()
+                    )),
+                    state: Box::new(Expr::Value(
+                        (Value::Number("10".parse().unwrap(), false)).with_empty_span()
+                    )),
+                    arguments: vec![],
+                    options: vec![],
+                }],
+                end_token: AttachedToken::empty(),
+            }),
+            characteristics: None,
+        }
+    );
+
+    let multi_statement_trigger = "\
+        CREATE TRIGGER some_trigger ON some_table FOR INSERT \
+        AS \
+        BEGIN \
+            DECLARE @var INT; \
+            RAISERROR('Trigger fired', 10, 1); \
+        END\
+    ";
+    let _ = ms().verified_stmt(multi_statement_trigger);
+
+    let create_trigger_with_return = "\
+        CREATE TRIGGER some_trigger ON some_table FOR INSERT \
+        AS \
+        BEGIN \
+            RETURN; \
+        END\
+    ";
+    let _ = ms().verified_stmt(create_trigger_with_return);
+
+    let create_trigger_with_return = "\
+        CREATE TRIGGER some_trigger ON some_table FOR INSERT \
+        AS \
+        BEGIN \
+            RETURN; \
+        END\
+    ";
+    let _ = ms().verified_stmt(create_trigger_with_return);
+
+    let create_trigger_with_conditional = "\
+        CREATE TRIGGER some_trigger ON some_table FOR INSERT \
+        AS \
+        BEGIN \
+            IF 1 = 2 \
+            BEGIN \
+                RAISERROR('Trigger fired', 10, 1); \
+            END; \
+            RETURN; \
+        END\
+    ";
+    let _ = ms().verified_stmt(create_trigger_with_conditional);
+}
+
+#[test]
 fn parse_drop_trigger() {
     let sql_drop_trigger = "DROP TRIGGER emp_stamp;";
     let drop_stmt = ms().one_statement_parses_to(sql_drop_trigger, "");

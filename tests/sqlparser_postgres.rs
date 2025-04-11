@@ -5095,13 +5095,14 @@ fn parse_create_simple_before_insert_trigger() {
         trigger_object: TriggerObject::Row,
         include_each: true,
         condition: None,
-        exec_body: TriggerExecBody {
+        exec_body: Some(TriggerExecBody {
             exec_type: TriggerExecBodyType::Function,
             func_desc: FunctionDesc {
                 name: ObjectName::from(vec![Ident::new("check_account_insert")]),
                 args: None,
             },
-        },
+        }),
+        statements: None,
         characteristics: None,
     };
 
@@ -5130,13 +5131,14 @@ fn parse_create_after_update_trigger_with_condition() {
             op: BinaryOperator::Gt,
             right: Box::new(Expr::value(number("10000"))),
         }))),
-        exec_body: TriggerExecBody {
+        exec_body: Some(TriggerExecBody {
             exec_type: TriggerExecBodyType::Function,
             func_desc: FunctionDesc {
                 name: ObjectName::from(vec![Ident::new("check_account_update")]),
                 args: None,
             },
-        },
+        }),
+        statements: None,
         characteristics: None,
     };
 
@@ -5158,13 +5160,14 @@ fn parse_create_instead_of_delete_trigger() {
         trigger_object: TriggerObject::Row,
         include_each: true,
         condition: None,
-        exec_body: TriggerExecBody {
+        exec_body: Some(TriggerExecBody {
             exec_type: TriggerExecBodyType::Function,
             func_desc: FunctionDesc {
                 name: ObjectName::from(vec![Ident::new("check_account_deletes")]),
                 args: None,
             },
-        },
+        }),
+        statements: None,
         characteristics: None,
     };
 
@@ -5190,13 +5193,14 @@ fn parse_create_trigger_with_multiple_events_and_deferrable() {
         trigger_object: TriggerObject::Row,
         include_each: true,
         condition: None,
-        exec_body: TriggerExecBody {
+        exec_body: Some(TriggerExecBody {
             exec_type: TriggerExecBodyType::Function,
             func_desc: FunctionDesc {
                 name: ObjectName::from(vec![Ident::new("check_account_changes")]),
                 args: None,
             },
-        },
+        }),
+        statements: None,
         characteristics: Some(ConstraintCharacteristics {
             deferrable: Some(true),
             initially: Some(DeferrableInitial::Deferred),
@@ -5233,13 +5237,14 @@ fn parse_create_trigger_with_referencing() {
         trigger_object: TriggerObject::Row,
         include_each: true,
         condition: None,
-        exec_body: TriggerExecBody {
+        exec_body: Some(TriggerExecBody {
             exec_type: TriggerExecBodyType::Function,
             func_desc: FunctionDesc {
                 name: ObjectName::from(vec![Ident::new("check_account_referencing")]),
                 args: None,
             },
-        },
+        }),
+        statements: None,
         characteristics: None,
     };
 
@@ -5259,7 +5264,7 @@ fn parse_create_trigger_invalid_cases() {
         ),
         (
             "CREATE TRIGGER check_update TOMORROW UPDATE ON accounts EXECUTE FUNCTION check_account_update",
-            "Expected: one of BEFORE or AFTER or INSTEAD, found: TOMORROW"
+            "Expected: one of FOR or BEFORE or AFTER or INSTEAD, found: TOMORROW"
         ),
         (
             "CREATE TRIGGER check_update BEFORE SAVE ON accounts EXECUTE FUNCTION check_account_update",
@@ -5534,13 +5539,14 @@ fn parse_trigger_related_functions() {
             trigger_object: TriggerObject::Row,
             include_each: true,
             condition: None,
-            exec_body: TriggerExecBody {
+            exec_body: Some(TriggerExecBody {
                 exec_type: TriggerExecBodyType::Function,
                 func_desc: FunctionDesc {
                     name: ObjectName::from(vec![Ident::new("emp_stamp")]),
                     args: None,
                 }
-            },
+            }),
+            statements: None,
             characteristics: None
         }
     );
