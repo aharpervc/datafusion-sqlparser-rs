@@ -16,7 +16,9 @@
 // under the License.
 
 use crate::ast::helpers::attached_token::AttachedToken;
-use crate::ast::{ConditionalStatementBlock, ConditionalStatements, IfStatement, Statement};
+use crate::ast::{
+    BeginEndStatements, ConditionalStatementBlock, ConditionalStatements, IfStatement, Statement,
+};
 use crate::dialect::Dialect;
 use crate::keywords::{self, Keyword};
 use crate::parser::{Parser, ParserError};
@@ -159,11 +161,11 @@ impl MsSqlDialect {
                 start_token: AttachedToken(if_token),
                 condition: Some(condition),
                 then_token: None,
-                conditional_statements: ConditionalStatements::BeginEnd {
+                conditional_statements: ConditionalStatements::BeginEnd(BeginEndStatements {
                     begin_token: AttachedToken(begin_token),
                     statements,
                     end_token: AttachedToken(end_token),
-                },
+                }),
             }
         } else {
             let stmt = parser.parse_statement()?;
@@ -192,11 +194,11 @@ impl MsSqlDialect {
                     start_token: AttachedToken(else_token),
                     condition: None,
                     then_token: None,
-                    conditional_statements: ConditionalStatements::BeginEnd {
+                    conditional_statements: ConditionalStatements::BeginEnd(BeginEndStatements {
                         begin_token: AttachedToken(begin_token),
                         statements,
                         end_token: AttachedToken(end_token),
-                    },
+                    }),
                 });
             } else {
                 let stmt = parser.parse_statement()?;
