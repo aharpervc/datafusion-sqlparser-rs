@@ -2914,8 +2914,8 @@ fn parse_mssql_go_keyword() {
     assert_eq!(stmts.len(), 2);
     assert_eq!(stmts[1], Statement::Go(GoStatement { count: None }));
 
-    let comment_following_go = "USE some_database;\nGO -- okay";
-    let stmts = ms().parse_sql_statements(comment_following_go).unwrap();
+    let single_line_comment_following_go = "USE some_database;\nGO -- okay";
+    let stmts = ms().parse_sql_statements(single_line_comment_following_go).unwrap();
     assert_eq!(stmts.len(), 2);
     assert_eq!(stmts[1], Statement::Go(GoStatement { count: None }));
 
@@ -2945,6 +2945,16 @@ fn parse_mssql_go_keyword() {
     //     }
     //     _ => panic!("Expected Query statement"),
     // }
+
+    let multi_line_comment_following = "USE some_database;\nGO/* okay */42";
+    let stmts = ms()
+        .parse_sql_statements(multi_line_comment_following)
+        .unwrap();
+    assert_eq!(stmts.len(), 2);
+    assert_eq!(stmts[1], Statement::Go(GoStatement { count: Some(42) }));
+
+    let actually_column_alias = "SELECT NULL GO";
+    let stmts = ms().parse_sql_statements(actually_column_alias).unwrap();
 
     let invalid_go_position = "SELECT 1; GO";
     let err = ms().parse_sql_statements(invalid_go_position);
