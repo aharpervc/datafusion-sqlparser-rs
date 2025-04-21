@@ -5206,11 +5206,8 @@ impl<'a> Parser<'a> {
     ) -> Result<Statement, ParserError> {
         let (name, args) = self.parse_create_function_name_and_params()?;
 
-        let return_type = if self.parse_keyword(Keyword::RETURNS) {
-            Some(self.parse_data_type()?)
-        } else {
-            return parser_err!("Expected RETURNS keyword", self.peek_token().span.start);
-        };
+        self.expect_keyword(Keyword::RETURNS)?;
+        let return_type = Some(self.parse_data_type()?);
 
         self.expect_keyword_is(Keyword::AS)?;
 
@@ -15307,6 +15304,16 @@ impl<'a> Parser<'a> {
         }
 
         Ok(Statement::Go(GoStatement { count }))
+    }
+
+    /// Parse [Statement::Return]
+    fn parse_return(&mut self) -> Result<Statement, ParserError> {
+        match self.maybe_parse(|p| p.parse_expr())? {
+            Some(expr) => Ok(Statement::Return(ReturnStatement {
+                value: Some(ReturnStatementValue::Expr(expr)),
+            })),
+            None => Ok(Statement::Return(ReturnStatement { value: None })),
+        }
     }
 
     /// Consume the parser and return its underlying token buffer

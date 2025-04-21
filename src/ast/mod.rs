@@ -9333,6 +9333,7 @@ impl Display for GoStatement {
         }
     }
 }
+
 /// Represents a `Return` statement.
 ///
 /// [MsSql triggers](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-trigger-transact-sql)
