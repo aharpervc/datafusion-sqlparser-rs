@@ -7840,6 +7840,7 @@ fn parse_create_view() {
     let sql = "CREATE VIEW myschema.myview AS SELECT foo FROM bar";
     match verified_stmt(sql) {
         Statement::CreateView {
+            or_alter,
             name,
             columns,
             query,
@@ -7854,6 +7855,7 @@ fn parse_create_view() {
             to,
             params,
         } => {
+            assert_eq!(or_alter, false);
             assert_eq!("myschema.myview", name.to_string());
             assert_eq!(Vec::<ViewColumnDef>::new(), columns);
             assert_eq!("SELECT foo FROM bar", query.to_string());
@@ -7870,6 +7872,8 @@ fn parse_create_view() {
         }
         _ => unreachable!(),
     }
+
+    let _ = verified_stmt("CREATE OR ALTER VIEW v AS SELECT 1");
 }
 
 #[test]
@@ -7904,6 +7908,7 @@ fn parse_create_view_with_columns() {
     // match all_dialects().verified_stmt(sql) {
     match all_dialects_except(|d| d.is::<ClickHouseDialect>()).verified_stmt(sql) {
         Statement::CreateView {
+            or_alter,
             name,
             columns,
             or_replace,
@@ -7918,6 +7923,7 @@ fn parse_create_view_with_columns() {
             to,
             params,
         } => {
+            assert_eq!(or_alter, false);
             assert_eq!("v", name.to_string());
             assert_eq!(
                 columns,
@@ -7951,6 +7957,7 @@ fn parse_create_view_temporary() {
     let sql = "CREATE TEMPORARY VIEW myschema.myview AS SELECT foo FROM bar";
     match verified_stmt(sql) {
         Statement::CreateView {
+            or_alter,
             name,
             columns,
             query,
@@ -7965,6 +7972,7 @@ fn parse_create_view_temporary() {
             to,
             params,
         } => {
+            assert_eq!(or_alter, false);
             assert_eq!("myschema.myview", name.to_string());
             assert_eq!(Vec::<ViewColumnDef>::new(), columns);
             assert_eq!("SELECT foo FROM bar", query.to_string());
@@ -7988,6 +7996,7 @@ fn parse_create_or_replace_view() {
     let sql = "CREATE OR REPLACE VIEW v AS SELECT 1";
     match verified_stmt(sql) {
         Statement::CreateView {
+            or_alter,
             name,
             columns,
             or_replace,
@@ -8002,6 +8011,7 @@ fn parse_create_or_replace_view() {
             to,
             params,
         } => {
+            assert_eq!(or_alter, false);
             assert_eq!("v", name.to_string());
             assert_eq!(columns, vec![]);
             assert_eq!(options, CreateTableOptions::None);
@@ -8029,6 +8039,7 @@ fn parse_create_or_replace_materialized_view() {
     let sql = "CREATE OR REPLACE MATERIALIZED VIEW v AS SELECT 1";
     match verified_stmt(sql) {
         Statement::CreateView {
+            or_alter,
             name,
             columns,
             or_replace,
@@ -8043,6 +8054,7 @@ fn parse_create_or_replace_materialized_view() {
             to,
             params,
         } => {
+            assert_eq!(or_alter, false);
             assert_eq!("v", name.to_string());
             assert_eq!(columns, vec![]);
             assert_eq!(options, CreateTableOptions::None);
@@ -8066,6 +8078,7 @@ fn parse_create_materialized_view() {
     let sql = "CREATE MATERIALIZED VIEW myschema.myview AS SELECT foo FROM bar";
     match verified_stmt(sql) {
         Statement::CreateView {
+            or_alter,
             name,
             or_replace,
             columns,
@@ -8080,6 +8093,7 @@ fn parse_create_materialized_view() {
             to,
             params,
         } => {
+            assert_eq!(or_alter, false);
             assert_eq!("myschema.myview", name.to_string());
             assert_eq!(Vec::<ViewColumnDef>::new(), columns);
             assert_eq!("SELECT foo FROM bar", query.to_string());
@@ -8103,6 +8117,7 @@ fn parse_create_materialized_view_with_cluster_by() {
     let sql = "CREATE MATERIALIZED VIEW myschema.myview CLUSTER BY (foo) AS SELECT foo FROM bar";
     match verified_stmt(sql) {
         Statement::CreateView {
+            or_alter,
             name,
             or_replace,
             columns,
@@ -8117,6 +8132,7 @@ fn parse_create_materialized_view_with_cluster_by() {
             to,
             params,
         } => {
+            assert_eq!(or_alter, false);
             assert_eq!("myschema.myview", name.to_string());
             assert_eq!(Vec::<ViewColumnDef>::new(), columns);
             assert_eq!("SELECT foo FROM bar", query.to_string());
@@ -11642,6 +11658,20 @@ fn parse_connect_by() {
 
 #[test]
 fn test_selective_aggregation() {
+    let testing_dialects = all_dialects_where(|d| d.supports_filter_during_aggregation());
+    let expected_dialects: Vec<Box<dyn Dialect>> = vec![
+        Box::new(PostgreSqlDialect {}),
+        Box::new(DatabricksDialect {}),
+        Box::new(HiveDialect {}),
+        Box::new(SQLiteDialect {}),
+        Box::new(DuckDbDialect {}),
+        Box::new(GenericDialect {}),
+    ];
+    assert_eq!(testing_dialects.dialects.len(), expected_dialects.len());
+    expected_dialects
+        .into_iter()
+        .for_each(|d| assert!(d.supports_filter_during_aggregation()));
+
     let sql = concat!(
         "SELECT ",
         "ARRAY_AGG(name) FILTER (WHERE name IS NOT NULL), ",
@@ -11649,9 +11679,7 @@ fn test_selective_aggregation() {
         "FROM region"
     );
     assert_eq!(
-        all_dialects_where(|d| d.supports_filter_during_aggregation())
-            .verified_only_select(sql)
-            .projection,
+        testing_dialects.verified_only_select(sql).projection,
         vec![
             SelectItem::UnnamedExpr(Expr::Function(Function {
                 name: ObjectName::from(vec![Ident::new("ARRAY_AGG")]),

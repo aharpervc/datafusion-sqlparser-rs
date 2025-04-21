@@ -3067,6 +3067,10 @@ pub enum Statement {
     /// CREATE VIEW
     /// ```
     CreateView {
+        /// True if this is a `CREATE OR ALTER VIEW` statement
+        ///
+        /// [MsSql](https://learn.microsoft.com/en-us/sql/t-sql/statements/create-view-transact-sql)
+        or_alter: bool,
         or_replace: bool,
         materialized: bool,
         /// View name
@@ -4658,6 +4662,7 @@ impl fmt::Display for Statement {
                 Ok(())
             }
             Statement::CreateView {
+                or_alter,
                 name,
                 or_replace,
                 columns,
@@ -4674,7 +4679,8 @@ impl fmt::Display for Statement {
             } => {
                 write!(
                     f,
-                    "CREATE {or_replace}",
+                    "CREATE {or_alter}{or_replace}",
+                    or_alter = if *or_alter { "OR ALTER " } else { "" },
                     or_replace = if *or_replace { "OR REPLACE " } else { "" },
                 )?;
                 if let Some(params) = params {
