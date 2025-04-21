@@ -15254,15 +15254,6 @@ impl<'a> Parser<'a> {
             message: Box::new(self.parse_expr()?),
         }))
     }
-    /// Parse [Statement::Return]
-    fn parse_return(&mut self) -> Result<Statement, ParserError> {
-        match self.maybe_parse(|p| p.parse_expr())? {
-            Some(expr) => Ok(Statement::Return(ReturnStatement {
-                value: Some(ReturnStatementValue::Expr(expr)),
-            })),
-            None => Ok(Statement::Return(ReturnStatement { value: None })),
-        }
-    }
 
     /// Parse [Statement::Go]
     fn parse_go(&mut self) -> Result<Statement, ParserError> {
