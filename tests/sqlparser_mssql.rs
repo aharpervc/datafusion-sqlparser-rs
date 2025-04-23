@@ -2928,10 +2928,9 @@ fn parse_mssql_go_keyword() {
     //     }
     // );
 
-    // let actually_column_alias_no_as = "SELECT NULL GO";
-    // let stmts = ms().parse_sql_statements(actually_column_alias_no_as).unwrap();
-    // assert_eq!(stmts.len(), 1);
-    // match &stmts[0] {
+    // let actually_column_alias = "SELECT NULL GO";
+    // let stmt = ms().one_statement_parses_to(actually_column_alias, "SELECT NULL AS GO");
+    // match &stmt {
     //     Statement::Query(query) => {
     //         let select = query.body.as_select().unwrap();
     //         assert_eq!(
@@ -2944,6 +2943,11 @@ fn parse_mssql_go_keyword() {
     //     }
     //     _ => panic!("Expected Query statement"),
     // }
+
+    let cte_following_go = "USE some_database;\nGO\n;WITH cte AS (\nSELECT 1 x\n)\nSELECT * FROM cte;";
+    let stmts = ms().parse_sql_statements(cte_following_go).unwrap();
+    assert_eq!(stmts.len(), 3);
+    assert_eq!(stmts[1], Statement::Go(GoStatement { count: None }));
 
     let multi_line_comment_following = "USE some_database;\nGO/* okay */42";
     let stmts =
@@ -2962,6 +2966,13 @@ fn parse_mssql_go_keyword() {
     assert_eq!(
         err.unwrap_err().to_string(),
         "sql parser error: Expected: literal int or newline, found: x"
+    );
+
+    let invalid_go_delimiter = "SELECT 1\nGO;";
+    let err = ms().parse_sql_statements(invalid_go_delimiter);
+    assert_eq!(
+        err.unwrap_err().to_string(),
+        "sql parser error: Expected: literal int or newline, found: ;"
     );
 }
 
