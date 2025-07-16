@@ -57,6 +57,9 @@ use sqlparser::ast::DateTimeField::Seconds;
 use sqlparser::ast::Expr::{Identifier, UnaryOp};
 use sqlparser::ast::Value::Number;
 use sqlparser::test_utils::all_dialects_except;
+use sqlparser::test_utils::all_dialects_not_requiring_semicolon_statement_delimiter;
+use sqlparser::test_utils::all_dialects_requiring_semicolon_statement_delimiter;
+use sqlparser::test_utils::assert_err_parse_statements;
 
 #[test]
 fn parse_numeric_literal_underscore() {
@@ -291,20 +294,39 @@ fn parse_insert_default_values() {
         "INSERT INTO test_table DEFAULT VALUES (some_column)";
     assert_eq!(
         ParserError::ParserError("Expected: end of statement, found: (".to_string()),
-        parse_sql_statements(insert_with_default_values_and_hive_after_columns).unwrap_err()
+        all_dialects_requiring_semicolon_statement_delimiter()
+            .parse_sql_statements(insert_with_default_values_and_hive_after_columns)
+            .unwrap_err()
+    );
+    assert_eq!(
+        ParserError::ParserError(
+            "Expected: SELECT, VALUES, or a subquery in the query body, found: some_column"
+                .to_string()
+        ),
+        all_dialects_not_requiring_semicolon_statement_delimiter()
+            .parse_sql_statements(insert_with_default_values_and_hive_after_columns)
+            .unwrap_err()
     );
 
-    let insert_with_default_values_and_hive_partition =
-        "INSERT INTO test_table DEFAULT VALUES PARTITION (some_column)";
-    assert_eq!(
-        ParserError::ParserError("Expected: end of statement, found: PARTITION".to_string()),
-        parse_sql_statements(insert_with_default_values_and_hive_partition).unwrap_err()
+    assert_err_parse_statements(
+        "INSERT INTO test_table DEFAULT VALUES PARTITION (some_column)",
+        "PARTITION",
     );
 
     let insert_with_default_values_and_values_list = "INSERT INTO test_table DEFAULT VALUES (1)";
     assert_eq!(
         ParserError::ParserError("Expected: end of statement, found: (".to_string()),
-        parse_sql_statements(insert_with_default_values_and_values_list).unwrap_err()
+        all_dialects_requiring_semicolon_statement_delimiter()
+            .parse_sql_statements(insert_with_default_values_and_values_list)
+            .unwrap_err()
+    );
+    assert_eq!(
+        ParserError::ParserError(
+            "Expected: SELECT, VALUES, or a subquery in the query body, found: 1".to_string()
+        ),
+        all_dialects_not_requiring_semicolon_statement_delimiter()
+            .parse_sql_statements(insert_with_default_values_and_values_list)
+            .unwrap_err()
     );
 }
 
@@ -433,11 +455,7 @@ fn parse_update() {
     );
 
     let sql = "UPDATE t SET a = 1 extrabadstuff";
-    let res = parse_sql_statements(sql);
-    assert_eq!(
-        ParserError::ParserError("Expected: end of statement, found: extrabadstuff".to_string()),
-        res.unwrap_err()
-    );
+    assert_err_parse_statements(sql, "extrabadstuff");
 }
 
 #[test]
@@ -943,9 +961,7 @@ fn parse_limit() {
 
 #[test]
 fn parse_invalid_limit_by() {
-    all_dialects()
-        .parse_sql_statements("SELECT * FROM user BY name")
-        .expect_err("BY without LIMIT");
+    assert_err_parse_statements("SELECT * FROM user BY name", "name");
 }
 
 #[test]
@@ -1125,11 +1141,7 @@ fn parse_select_into() {
 
     // Do not allow aliases here
     let sql = "SELECT * INTO table0 asdf FROM table1";
-    let result = parse_sql_statements(sql);
-    assert_eq!(
-        ParserError::ParserError("Expected: end of statement, found: asdf".to_string()),
-        result.unwrap_err()
-    )
+    assert_err_parse_statements(sql, "asdf");
 }
 
 #[test]
@@ -1165,11 +1177,7 @@ fn parse_select_wildcard() {
     );
 
     let sql = "SELECT * + * FROM foo;";
-    let result = parse_sql_statements(sql);
-    assert_eq!(
-        ParserError::ParserError("Expected: end of statement, found: +".to_string()),
-        result.unwrap_err(),
-    );
+    assert_err_parse_statements(sql, "+");
 }
 
 #[test]
@@ -1399,11 +1407,7 @@ fn parse_not() {
 
 #[test]
 fn parse_invalid_infix_not() {
-    let res = parse_sql_statements("SELECT c FROM t WHERE c NOT (");
-    assert_eq!(
-        ParserError::ParserError("Expected: end of statement, found: NOT".to_string()),
-        res.unwrap_err(),
-    );
+    assert_err_parse_statements("SELECT c FROM t WHERE c NOT (", "NOT");
 }
 
 #[test]
@@ -4963,10 +4967,7 @@ fn parse_rename_table() {
         _ => unreachable!(),
     };
 
-    assert_eq!(
-        parse_sql_statements("RENAME TABLE old_table TO new_table a").unwrap_err(),
-        ParserError::ParserError("Expected: end of statement, found: a".to_string())
-    );
+    assert_err_parse_statements("RENAME TABLE old_table TO new_table a", "a");
 
     assert_eq!(
         parse_sql_statements("RENAME TABLE1 old_table TO new_table a").unwrap_err(),
@@ -5273,13 +5274,22 @@ fn parse_alter_table_alter_column_type() {
         "{alter_stmt} ALTER COLUMN is_active SET DATA TYPE TEXT USING 'text'"
     ));
 
-    let dialects = all_dialects_except(|d| d.supports_alter_column_type_using());
-    let res = dialects.parse_sql_statements(&format!(
-        "{alter_stmt} ALTER COLUMN is_active SET DATA TYPE TEXT USING 'text'"
-    ));
+    let sql = "{alter_stmt} ALTER COLUMN is_active SET DATA TYPE TEXT USING 'text'";
+    let dialects = all_dialects_where(|d| {
+        !d.supports_alter_column_type_using()
+            && !d.supports_statements_without_semicolon_delimiter()
+    });
     assert_eq!(
-        ParserError::ParserError("Expected: end of statement, found: USING".to_string()),
-        res.unwrap_err()
+        ParserError::ParserError("Expected: an SQL statement, found: {".to_string()),
+        dialects.parse_sql_statements(sql).unwrap_err()
+    );
+
+    let dialects = all_dialects_where(|d| {
+        !d.supports_alter_column_type_using() && d.supports_statements_without_semicolon_delimiter()
+    });
+    assert_eq!(
+        ParserError::ParserError("Expected: an SQL statement, found: {".to_string()),
+        dialects.parse_sql_statements(sql).unwrap_err()
     );
 }
 
@@ -5307,11 +5317,7 @@ fn parse_alter_table_drop_constraint() {
         }
     }
 
-    let res = parse_sql_statements("ALTER TABLE tab DROP CONSTRAINT is_active TEXT");
-    assert_eq!(
-        ParserError::ParserError("Expected: end of statement, found: TEXT".to_string()),
-        res.unwrap_err()
-    );
+    assert_err_parse_statements("ALTER TABLE tab DROP CONSTRAINT is_active TEXT", "TEXT");
 }
 
 #[test]
@@ -5554,10 +5560,13 @@ fn parse_explain_query_plan() {
     // missing PLAN keyword should return error
     assert_eq!(
         ParserError::ParserError("Expected: end of statement, found: SELECT".to_string()),
-        all_dialects()
+        all_dialects_requiring_semicolon_statement_delimiter()
             .parse_sql_statements("EXPLAIN QUERY SELECT sqrt(id) FROM foo")
             .unwrap_err()
     );
+    assert!(all_dialects_not_requiring_semicolon_statement_delimiter()
+        .parse_sql_statements("EXPLAIN QUERY SELECT sqrt(id) FROM foo")
+        .is_ok());
 }
 
 #[test]
@@ -6300,16 +6309,22 @@ fn parse_interval_all() {
         expr_from_projection(only(&select.projection)),
     );
 
-    let result = parse_sql_statements("SELECT INTERVAL '1' SECOND TO SECOND");
-    assert_eq!(
-        ParserError::ParserError("Expected: end of statement, found: SECOND".to_string()),
-        result.unwrap_err(),
-    );
+    assert_err_parse_statements("SELECT INTERVAL '1' SECOND TO SECOND", "SECOND");
 
-    let result = parse_sql_statements("SELECT INTERVAL '10' HOUR (1) TO HOUR (2)");
+    let incorrect_hour_interval = "SELECT INTERVAL '10' HOUR (1) TO HOUR (2)";
     assert_eq!(
         ParserError::ParserError("Expected: end of statement, found: (".to_string()),
-        result.unwrap_err(),
+        all_dialects_requiring_semicolon_statement_delimiter()
+            .parse_sql_statements(incorrect_hour_interval)
+            .unwrap_err(),
+    );
+    assert_eq!(
+        ParserError::ParserError(
+            "Expected: SELECT, VALUES, or a subquery in the query body, found: 2".to_string()
+        ),
+        all_dialects_not_requiring_semicolon_statement_delimiter()
+            .parse_sql_statements(incorrect_hour_interval)
+            .unwrap_err(),
     );
 
     verified_only_select("SELECT INTERVAL '1' YEAR");
@@ -7979,11 +7994,17 @@ fn parse_multiple_statements() {
         // Check that extra semicolon at the end is stripped by normalization:
         one_statement_parses_to(&(sql1.to_owned() + ";"), sql1);
         // Check that forgetting the semicolon results in an error:
-        let res = parse_sql_statements(&(sql1.to_owned() + " " + sql2_kw + sql2_rest));
+        // (if configured as required by the dialect)
+        let sql = sql1.to_owned() + " " + sql2_kw + sql2_rest;
         assert_eq!(
             ParserError::ParserError("Expected: end of statement, found: ".to_string() + sql2_kw),
-            res.unwrap_err()
+            all_dialects_requiring_semicolon_statement_delimiter()
+                .parse_sql_statements(&sql)
+                .unwrap_err()
         );
+        assert!(all_dialects_not_requiring_semicolon_statement_delimiter()
+            .parse_sql_statements(&sql)
+            .is_ok());
     }
     test_with("SELECT foo", "SELECT", " bar");
     // ensure that SELECT/WITH is not parsed as a table or column alias if ';'
@@ -8724,11 +8745,7 @@ fn parse_drop_user() {
 
 #[test]
 fn parse_invalid_subquery_without_parens() {
-    let res = parse_sql_statements("SELECT SELECT 1 FROM bar WHERE 1=1 FROM baz");
-    assert_eq!(
-        ParserError::ParserError("Expected: end of statement, found: 1".to_string()),
-        res.unwrap_err()
-    );
+    assert_err_parse_statements("SELECT SELECT 1 FROM bar WHERE 1=1 FROM baz", "1");
 }
 
 #[test]
@@ -8955,10 +8972,17 @@ fn lateral_derived() {
     chk(true);
 
     let sql = "SELECT * FROM LATERAL UNNEST ([10,20,30]) as numbers WITH OFFSET;";
-    let res = parse_sql_statements(sql);
     assert_eq!(
         ParserError::ParserError("Expected: end of statement, found: WITH".to_string()),
-        res.unwrap_err()
+        all_dialects_requiring_semicolon_statement_delimiter()
+            .parse_sql_statements(sql)
+            .unwrap_err()
+    );
+    assert_eq!(
+        ParserError::ParserError("Expected: AS, found: ;".to_string()),
+        all_dialects_not_requiring_semicolon_statement_delimiter()
+            .parse_sql_statements(sql)
+            .unwrap_err()
     );
 
     let sql = "SELECT * FROM a LEFT JOIN LATERAL (b CROSS JOIN c)";
@@ -9093,11 +9117,7 @@ fn parse_start_transaction() {
         res.unwrap_err()
     );
 
-    let res = dialects.parse_sql_statements("START TRANSACTION BAD");
-    assert_eq!(
-        ParserError::ParserError("Expected: end of statement, found: BAD".to_string()),
-        res.unwrap_err()
-    );
+    assert_err_parse_statements("START TRANSACTION BAD", "BAD");
 
     let res = dialects.parse_sql_statements("START TRANSACTION READ ONLY,");
     assert_eq!(
@@ -10559,23 +10579,9 @@ fn parse_offset_and_limit() {
     verified_stmt("SELECT foo FROM bar OFFSET 2");
 
     // Can't repeat OFFSET / LIMIT
-    let res = parse_sql_statements("SELECT foo FROM bar OFFSET 2 OFFSET 2");
-    assert_eq!(
-        ParserError::ParserError("Expected: end of statement, found: OFFSET".to_string()),
-        res.unwrap_err()
-    );
-
-    let res = parse_sql_statements("SELECT foo FROM bar LIMIT 2 LIMIT 2");
-    assert_eq!(
-        ParserError::ParserError("Expected: end of statement, found: LIMIT".to_string()),
-        res.unwrap_err()
-    );
-
-    let res = parse_sql_statements("SELECT foo FROM bar OFFSET 2 LIMIT 2 OFFSET 2");
-    assert_eq!(
-        ParserError::ParserError("Expected: end of statement, found: OFFSET".to_string()),
-        res.unwrap_err()
-    );
+    assert_err_parse_statements("SELECT foo FROM bar OFFSET 2 OFFSET 2", "OFFSET");
+    assert_err_parse_statements("SELECT foo FROM bar LIMIT 2 LIMIT 2", "LIMIT");
+    assert_err_parse_statements("SELECT foo FROM bar OFFSET 2 LIMIT 2 OFFSET 2", "OFFSET");
 }
 
 #[test]
@@ -11043,11 +11049,7 @@ fn parse_uncache_table() {
         }
     );
 
-    let res = parse_sql_statements("UNCACHE TABLE 'table_name' foo");
-    assert_eq!(
-        ParserError::ParserError("Expected: end of statement, found: foo".to_string()),
-        res.unwrap_err()
-    );
+    assert_err_parse_statements("UNCACHE TABLE 'table_name' foo", "foo");
 
     let res = parse_sql_statements("UNCACHE 'table_name' foo");
     assert_eq!(
@@ -14307,13 +14309,7 @@ fn test_drop_policy() {
         "sql parser error: Expected: ON, found: EOF"
     );
     // Wrong option name
-    assert_eq!(
-        all_dialects()
-            .parse_sql_statements("DROP POLICY my_policy ON my_table WRONG")
-            .unwrap_err()
-            .to_string(),
-        "sql parser error: Expected: end of statement, found: WRONG"
-    );
+    assert_err_parse_statements("DROP POLICY my_policy ON my_table WRONG", "WRONG");
 }
 
 #[test]
@@ -14354,18 +14350,27 @@ fn test_alter_policy() {
     verified_stmt("ALTER POLICY my_policy ON my_table");
 
     // mixing RENAME and APPLY expressions
+    let sql = "ALTER POLICY old_policy ON my_table TO public RENAME TO new_policy";
     assert_eq!(
-        parse_sql_statements("ALTER POLICY old_policy ON my_table TO public RENAME TO new_policy")
+        all_dialects_requiring_semicolon_statement_delimiter()
+            .parse_sql_statements(sql)
             .unwrap_err()
             .to_string(),
-        "sql parser error: Expected: end of statement, found: RENAME"
+        "sql parser error: Expected: end of statement, found: RENAME".to_string(),
     );
     assert_eq!(
-        parse_sql_statements("ALTER POLICY old_policy ON my_table RENAME TO new_policy TO public")
+        all_dialects_not_requiring_semicolon_statement_delimiter()
+            .parse_sql_statements(sql)
             .unwrap_err()
             .to_string(),
-        "sql parser error: Expected: end of statement, found: TO"
+        "sql parser error: Expected: KEYWORD `TABLE` after RENAME, found: TO".to_string(),
     );
+
+    assert_err_parse_statements(
+        "ALTER POLICY old_policy ON my_table RENAME TO new_policy TO public",
+        "TO",
+    );
+
     // missing TO in RENAME TO
     assert_eq!(
         parse_sql_statements("ALTER POLICY old_policy ON my_table RENAME")
@@ -14563,14 +14568,9 @@ fn test_alter_connector() {
     }
 
     // Wrong option name
-    assert_eq!(
-        dialects
-            .parse_sql_statements(
-                "ALTER CONNECTOR my_connector SET WRONG 'jdbc:mysql://localhost:3306/mydb'"
-            )
-            .unwrap_err()
-            .to_string(),
-        "sql parser error: Expected: end of statement, found: WRONG"
+    assert_err_parse_statements(
+        "ALTER CONNECTOR my_connector SET WRONG 'jdbc:mysql://localhost:3306/mydb'",
+        "WRONG",
     );
 }
 
@@ -15323,11 +15323,24 @@ fn parse_create_table_select() {
         r#"CREATE TABLE foo (baz INT, name STRING) AS SELECT bar, oth_name FROM test.table_a"#;
     let _ = dialects.one_statement_parses_to(sql_2, expected);
 
-    let dialects = all_dialects_where(|d| !d.supports_create_table_select());
+    let err_dialects = all_dialects_where(|d| {
+        !d.supports_create_table_select() && !d.supports_statements_without_semicolon_delimiter()
+    });
+    let multi_statement_dialects = all_dialects_where(|d| {
+        !d.supports_create_table_select() && d.supports_statements_without_semicolon_delimiter()
+    });
     for sql in [sql_1, sql_2] {
         assert_eq!(
-            dialects.parse_sql_statements(sql).unwrap_err(),
+            err_dialects.parse_sql_statements(sql).unwrap_err(),
             ParserError::ParserError("Expected: end of statement, found: SELECT".to_string())
+        );
+
+        assert_eq!(
+            multi_statement_dialects
+                .parse_sql_statements(sql)
+                .unwrap()
+                .len(),
+            2
         );
     }
 }
@@ -15662,7 +15675,17 @@ fn parse_update_from_before_select() {
     "UPDATE t1 FROM (SELECT name, id FROM t1 GROUP BY id) AS t2 SET name = t2.name FROM (SELECT name from t2) AS t2";
     assert_eq!(
         ParserError::ParserError("Expected: end of statement, found: FROM".to_string()),
-        parse_sql_statements(query).unwrap_err()
+        all_dialects_requiring_semicolon_statement_delimiter()
+            .parse_sql_statements(query)
+            .unwrap_err()
+    );
+    assert_eq!(
+        ParserError::ParserError(
+            "Expected: SELECT, VALUES, or a subquery in the query body, found: FROM".to_string()
+        ),
+        all_dialects_not_requiring_semicolon_statement_delimiter()
+            .parse_sql_statements(query)
+            .unwrap_err()
     );
 }
 #[test]
@@ -17086,6 +17109,34 @@ fn parse_return() {
     assert_eq!(stmt, Statement::Return(ReturnStatement { value: None }));
 
     let _ = all_dialects().verified_stmt("RETURN 1");
+    let _ = all_dialects().verified_stmt("RETURN -1");
+    let _ = all_dialects_where(|d| d.is_identifier_start('@')).verified_stmt("RETURN @my_var");
+    let _ = all_dialects().verified_stmt("RETURN CAST(1 AS INT)");
+    let _ = all_dialects().verified_stmt("RETURN dbo.my_func()");
+    let _ = all_dialects().verified_stmt("RETURN (SELECT 1)");
+    let _ = all_dialects().verified_stmt("RETURN CASE 1 WHEN 1 THEN 2 END");
+
+    let _ = all_dialects_where(|d| {
+        d.is::<GenericDialect>()
+            || d.is::<PostgreSqlDialect>()
+            || d.is::<MySqlDialect>()
+            || d.is::<BigQueryDialect>()
+            || d.is::<SQLiteDialect>()
+            || d.is::<DuckDbDialect>()
+            || d.is::<DatabricksDialect>()
+            || d.is::<ClickHouseDialect>()
+    })
+    .verified_stmt("RETURN CONVERT(1, INT)");
+
+    let _ = all_dialects_except(|d| {
+        d.is::<GenericDialect>()
+            || d.is::<AnsiDialect>()
+            || d.is::<RedshiftSqlDialect>()
+            || d.is::<MsSqlDialect>()
+            || d.is::<HiveDialect>()
+            || d.is::<SnowflakeDialect>()
+    })
+    .verified_stmt("RETURN CONVERT(1, INT)");
 }
 
 #[test]
