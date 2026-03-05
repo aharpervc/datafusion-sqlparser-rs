@@ -398,7 +398,7 @@ fn parse_table_time_travel() {
         .parse_sql_statements("SELECT 1 FROM t1 FOR TIMESTAMP AS OF 'some_timestamp'")
         .is_err());
 
-    assert!(all_dialects_where(|d| d.supports_table_versioning())
+    assert!(all_dialects_where(|d| d.supports_table_versioning() && !d.supports_statements_without_semicolon_delimiter())
         .parse_sql_statements("SELECT 1 FROM t1 VERSION AS OF 1 - 2",)
         .is_err())
 }

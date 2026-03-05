@@ -2899,7 +2899,9 @@ fn test_supports_statements_without_semicolon_delimiter() {
                 pipe_operators: vec![],
                 body: Box::new(SetExpr::Select(Box::new(Select {
                     select_token: AttachedToken::empty(),
+                    optimizer_hints: vec![],
                     distinct: None,
+                    select_modifiers: None,
                     top: None,
                     top_before_distinct: false,
                     projection: vec![SelectItem::UnnamedExpr(Expr::Value(
@@ -2920,7 +2922,7 @@ fn test_supports_statements_without_semicolon_delimiter() {
                     window_before_qualify: false,
                     qualify: None,
                     value_table_mode: None,
-                    connect_by: None,
+                    connect_by: vec![],
                     flavor: SelectFlavor::Standard,
                 }))),
             })),
@@ -2936,7 +2938,9 @@ fn test_supports_statements_without_semicolon_delimiter() {
                 pipe_operators: vec![],
                 body: Box::new(SetExpr::Select(Box::new(Select {
                     select_token: AttachedToken::empty(),
+                    optimizer_hints: vec![],
                     distinct: None,
+                    select_modifiers: None,
                     top: None,
                     top_before_distinct: false,
                     projection: vec![SelectItem::UnnamedExpr(Expr::Value(
@@ -2957,7 +2961,7 @@ fn test_supports_statements_without_semicolon_delimiter() {
                     window_before_qualify: false,
                     qualify: None,
                     value_table_mode: None,
-                    connect_by: None,
+                    connect_by: vec![],
                     flavor: SelectFlavor::Standard
                 }))),
             })),
@@ -3031,6 +3035,8 @@ fn test_supports_statements_without_semicolon_delimiter() {
             behavior: None,
             called_on_null: None,
             parallel: None,
+            security: None,
+            set_params: vec![],
             using: None,
             language: None,
             determinism_specifier: None,
@@ -3114,7 +3120,9 @@ fn test_supports_statements_without_semicolon_delimiter() {
                                             with: None,
                                             body: Box::new(SetExpr::Select(Box::new(Select {
                                                 select_token: AttachedToken::empty(),
+                                                optimizer_hints: vec![],
                                                 distinct: None,
+                                                select_modifiers: None,
                                                 top: None,
                                                 top_before_distinct: false,
                                                 projection: vec![SelectItem::UnnamedExpr(
@@ -3138,7 +3146,7 @@ fn test_supports_statements_without_semicolon_delimiter() {
                                                 qualify: None,
                                                 window_before_qualify: false,
                                                 value_table_mode: None,
-                                                connect_by: None,
+                                                connect_by: vec![],
                                                 flavor: SelectFlavor::Standard,
                                             }),)),
                                             order_by: None,
@@ -3195,7 +3203,9 @@ fn test_supports_statements_without_semicolon_delimiter() {
                 output: false,
                 default: false,
             },
-            Statement::Update {
+            Statement::Update(Update {
+                update_token: AttachedToken::empty(),
+                optimizer_hints: vec![],
                 table: TableWithJoins {
                     relation: TableFactor::Table {
                         name: ObjectName::from(vec![Ident::new("my_table")]),
@@ -3218,12 +3228,13 @@ fn test_supports_statements_without_semicolon_delimiter() {
                     ),
                     target: AssignmentTarget::ColumnName(ObjectName::from(vec![Ident::new("col")])),
                 },],
+                from: None,
                 selection: None,
                 returning: None,
-                from: None,
+                output: None,
                 or: None,
                 limit: None,
-            },
+            }),
         ]
     );
 
@@ -3256,7 +3267,9 @@ fn test_supports_statements_without_semicolon_delimiter() {
                 output: false,
                 default: false,
             },
-            Statement::Update {
+            Statement::Update(Update {
+                update_token: AttachedToken::empty(),
+                optimizer_hints: vec![],
                 table: TableWithJoins {
                     relation: TableFactor::Table {
                         name: ObjectName::from(vec![Ident::with_span(
@@ -3285,12 +3298,13 @@ fn test_supports_statements_without_semicolon_delimiter() {
                         "col"
                     )])),
                 },],
+                from: None,
                 selection: None,
                 returning: None,
-                from: None,
+                output: None,
                 or: None,
                 limit: None,
-            },
+            }),
         ]
     );
 }

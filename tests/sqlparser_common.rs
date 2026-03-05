@@ -1007,7 +1007,7 @@ fn parse_invalid_limit_by() {
             .unwrap_err()
     );
     assert_eq!(
-        ParserError::ParserError("Expected: an SQL statement, found: BY".to_string()),
+        ParserError::ParserError("Expected: an SQL statement, found: name".to_string()),
         all_dialects_not_requiring_semicolon_statement_delimiter()
             .parse_sql_statements("SELECT * FROM user BY name")
             .unwrap_err()
