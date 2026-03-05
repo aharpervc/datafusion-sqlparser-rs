@@ -19625,7 +19625,7 @@ impl<'a> Parser<'a> {
                 | Expr::Cast { .. }
                 | Expr::Convert { .. }
                 | Expr::Subquery(_) => Ok(expr),
-                // todo: how to retstrict to variables?
+                // todo: how to restrict to variables?
                 Expr::Identifier(id) if id.value.starts_with('@') => Ok(expr),
                 _ => parser_err!(
                     "Non-returnable expression found following RETURN",
