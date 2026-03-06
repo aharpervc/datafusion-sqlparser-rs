@@ -2918,31 +2918,31 @@ fn parse_mssql_go_keyword() {
         ms().statements_parse_to(single_line_comment_following_go, 2, "USE some_database\nGO");
     assert_eq!(stmts[1], Statement::Go(GoStatement { count: None }));
 
-    // let actually_column_alias = "SELECT NULL AS GO";
-    // let stmt = ms().verified_only_select(actually_column_alias);
-    // assert_eq!(
-    //     only(stmt.projection),
-    //     SelectItem::ExprWithAlias {
-    //         expr: Expr::Value(Value::Null.with_empty_span()),
-    //         alias: Ident::new("GO"),
-    //     }
-    // );
+    let actually_column_alias = "SELECT NULL AS GO";
+    let stmt = ms().verified_only_select(actually_column_alias);
+    assert_eq!(
+        only(stmt.projection),
+        SelectItem::ExprWithAlias {
+            expr: Expr::Value(Value::Null.with_empty_span()),
+            alias: Ident::new("GO"),
+        }
+    );
 
-    // let actually_column_alias = "SELECT NULL GO";
-    // let stmt = ms().one_statement_parses_to(actually_column_alias, "SELECT NULL AS GO");
-    // match &stmt {
-    //     Statement::Query(query) => {
-    //         let select = query.body.as_select().unwrap();
-    //         assert_eq!(
-    //             only(select.clone().projection),
-    //             SelectItem::ExprWithAlias {
-    //                 expr: Expr::Value(Value::Null.with_empty_span()),
-    //                 alias: Ident::new("GO"),
-    //             }
-    //         );
-    //     }
-    //     _ => panic!("Expected Query statement"),
-    // }
+    let actually_column_alias = "SELECT NULL GO";
+    let stmt = ms().one_statement_parses_to(actually_column_alias, "SELECT NULL AS GO");
+    match &stmt {
+        Statement::Query(query) => {
+            let select = query.body.as_select().unwrap();
+            assert_eq!(
+                only(select.clone().projection),
+                SelectItem::ExprWithAlias {
+                    expr: Expr::Value(Value::Null.with_empty_span()),
+                    alias: Ident::new("GO"),
+                }
+            );
+        }
+        _ => panic!("Expected Query statement"),
+    }
 
     let cte_following_go = "USE some_database;\nGO\n;WITH cte AS (\nSELECT 1 x\n)\nSELECT * FROM cte;";
     let stmts = ms().parse_sql_statements(cte_following_go).unwrap();

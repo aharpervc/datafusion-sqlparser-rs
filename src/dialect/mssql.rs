@@ -156,7 +156,6 @@ impl Dialect for MsSqlDialect {
             | Keyword::PRINT
             | Keyword::WHILE
             | Keyword::RETURN
-            | Keyword::GO
             | Keyword::THROW
             | Keyword::RAISERROR
             | Keyword::MERGE => false,
