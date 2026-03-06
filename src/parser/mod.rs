@@ -292,6 +292,22 @@ impl ParserOptions {
         self.unescape = unescape;
         self
     }
+
+    /// Set if semicolon statement delimiters are required.
+    ///
+    /// If this option is `true`, the following SQL will not parse. If the option is `false`, the SQL will parse.
+    ///
+    /// ```sql
+    /// SELECT 1
+    /// SELECT 2
+    /// ```
+    pub fn with_require_semicolon_stmt_delimiter(
+        mut self,
+        require_semicolon_stmt_delimiter: bool,
+    ) -> Self {
+        self.require_semicolon_stmt_delimiter = require_semicolon_stmt_delimiter;
+        self
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -415,7 +431,11 @@ impl<'a> Parser<'a> {
             state: ParserState::Normal,
             dialect,
             recursion_counter: RecursionCounter::new(DEFAULT_REMAINING_DEPTH),
-            options: ParserOptions::new().with_trailing_commas(dialect.supports_trailing_commas()),
+            options: ParserOptions::new()
+                .with_trailing_commas(dialect.supports_trailing_commas())
+                .with_require_semicolon_stmt_delimiter(
+                    !dialect.supports_statements_without_semicolon_delimiter(),
+                ),
             failed_prefix_positions: BTreeMap::new(),
             failed_reserved_word_prefix_positions: BTreeMap::new(),
             failed_derived_table_factor_positions: BTreeSet::new(),
@@ -543,12 +563,17 @@ impl<'a> Parser<'a> {
 
             match &self.peek_token_ref().token {
                 Token::EOF => break,
-
                 // end of statement
                 Token::Word(word)
                     if expecting_statement_delimiter && word.keyword == Keyword::END =>
                 {
                     break;
+                }
+                // don't expect a semicolon statement delimiter after a newline when not otherwise required
+                Token::Whitespace(Whitespace::Newline) => {
+                    if !self.options.require_semicolon_stmt_delimiter {
+                        expecting_statement_delimiter = false;
+                    }
                 }
                 _ => {}
             }
@@ -559,7 +584,7 @@ impl<'a> Parser<'a> {
 
             let statement = self.parse_statement()?;
             stmts.push(statement);
-            expecting_statement_delimiter = true;
+            expecting_statement_delimiter = self.options.require_semicolon_stmt_delimiter;
         }
         Ok(stmts)
     }
@@ -5111,6 +5136,14 @@ impl<'a> Parser<'a> {
             return Ok(vec![]);
         }
 
+        if end_token == Token::SemiColon && !self.options.require_semicolon_stmt_delimiter {
+            if let Token::Word(ref kw) = self.peek_token().token {
+                if kw.keyword != Keyword::NoKeyword {
+                    return Ok(vec![]);
+                }
+            }
+        }
+
         if self.options.trailing_commas && self.peek_tokens() == [Token::Comma, end_token] {
             let _ = self.consume_token(&Token::Comma);
             return Ok(vec![]);
@@ -5128,6 +5161,9 @@ impl<'a> Parser<'a> {
     ) -> Result<Vec<Statement>, ParserError> {
         let mut values = vec![];
         loop {
+            // ignore empty statements (between successive statement delimiters)
+            while self.consume_token(&Token::SemiColon) {}
+
             match &self.peek_nth_token_ref(0).token {
                 Token::EOF => break,
                 Token::Word(w)
@@ -5139,7 +5175,13 @@ impl<'a> Parser<'a> {
             }
 
             values.push(self.parse_statement()?);
-            self.expect_token(&Token::SemiColon)?;
+
+            if self.options.require_semicolon_stmt_delimiter {
+                self.expect_token(&Token::SemiColon)?;
+            }
+
+            // ignore empty statements (between successive statement delimiters)
+            while self.consume_token(&Token::SemiColon) {}
         }
         Ok(values)
     }
@@ -20587,7 +20629,28 @@ impl<'a> Parser<'a> {
 
     /// Parse [Statement::Return]
     fn parse_return(&mut self) -> Result<Statement, ParserError> {
-        match self.maybe_parse(|p| p.parse_expr())? {
+        let rs = self.maybe_parse(|p| {
+            let expr = p.parse_expr()?;
+
+            match &expr {
+                Expr::Value(_)
+                | Expr::Function(_)
+                | Expr::UnaryOp { .. }
+                | Expr::BinaryOp { .. }
+                | Expr::Case { .. }
+                | Expr::Cast { .. }
+                | Expr::Convert { .. }
+                | Expr::Subquery(_) => Ok(expr),
+                // todo: how to restrict to variables?
+                Expr::Identifier(id) if id.value.starts_with('@') => Ok(expr),
+                _ => parser_err!(
+                    "Non-returnable expression found following RETURN",
+                    p.peek_token().span.start
+                ),
+            }
+        })?;
+
+        match rs {
             Some(expr) => Ok(Statement::Return(ReturnStatement {
                 value: Some(ReturnStatementValue::Expr(expr)),
             })),
