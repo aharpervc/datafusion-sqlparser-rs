@@ -138,6 +138,12 @@ impl Dialect for MsSqlDialect {
     }
 
     fn is_select_item_alias(&self, explicit: bool, kw: &Keyword, parser: &mut Parser) -> bool {
+        // if we find maybe whitespace then a newline looking backward, then `GO` ISN'T a column alias
+        // if we can't find a newline then we assume that `GO` IS a column alias
+        if kw == &Keyword::GO && parser.prev_only_whitespace_until_newline() {
+            return false;
+        }
+
         match kw {
             // List of keywords that cannot be used as select item (column) aliases in MSSQL
             // regardless of whether the alias is explicit or implicit.
@@ -194,6 +200,7 @@ impl Dialect for MsSqlDialect {
             | Keyword::PRINT
             | Keyword::WHILE
             | Keyword::RETURN
+            | Keyword::GO
             | Keyword::THROW
             | Keyword::RAISERROR
             | Keyword::MERGE => false,

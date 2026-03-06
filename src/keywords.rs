@@ -473,6 +473,7 @@ define_keywords!(
     GIST,
     GLOB,
     GLOBAL,
+    GO,
     GRANT,
     GRANTED,
     GRANTS,
