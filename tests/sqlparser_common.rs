@@ -9625,7 +9625,9 @@ fn parse_abort() {
     one_statement_parses_to("ABORT WORK AND NO CHAIN", "ROLLBACK");
 
     assert_eq!(
-        parse_sql_statements("ABORT TO test1").unwrap_err(),
+        all_dialects_requiring_semicolon_statement_delimiter()
+            .parse_sql_statements("ABORT TO test1")
+            .unwrap_err(),
         ParserError::ParserError("Expected: end of statement, found: TO".to_string()),
     );
 }

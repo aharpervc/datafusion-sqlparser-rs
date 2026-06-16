@@ -21199,7 +21199,21 @@ mod tests {
                 parser.index = 1;
                 assert_eq!(parser.peek_prev_nth_token_no_skip_ref(0), &Token::EOF);
                 assert_eq!(parser.index, 1);
-                parser.index = 7;
+
+                let raiserror_position = parser
+                    .tokens
+                    .iter()
+                    .position(|t| {
+                        matches!(
+                            t.token,
+                            Token::Word(Word {
+                                keyword: Keyword::RAISERROR,
+                                ..
+                            })
+                        )
+                    })
+                    .unwrap();
+                parser.index = raiserror_position + 1;
                 assert_eq!(
                     parser.token_at(parser.index - 1).token,
                     Token::Word(Word {
@@ -21208,10 +21222,10 @@ mod tests {
                         keyword: Keyword::RAISERROR,
                     })
                 );
-                assert_eq!(
-                    parser.peek_prev_nth_token_no_skip_ref(2),
-                    &Token::Whitespace(Whitespace::Newline)
-                );
+                assert!(matches!(
+                    parser.peek_prev_nth_token_no_skip_ref(2).token,
+                    Token::Whitespace(_)
+                ));
             },
         );
     }

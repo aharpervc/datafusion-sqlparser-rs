@@ -3016,16 +3016,18 @@ fn test_supports_statements_without_semicolon_delimiter() {
                 "utc_now"
             )]),
             args: Some(vec![]),
-            return_type: Some(sqlparser::ast::DataType::Custom(
-                ObjectName(vec![sqlparser::ast::ObjectNamePart::Identifier(Ident {
-                    value: "SMALLDATETIME".to_string(),
-                    quote_style: None,
-                    span: Span {
-                        start: Location::new(2, 17),
-                        end: Location::new(2, 30)
-                    },
-                })]),
-                vec![]
+            return_type: Some(sqlparser::ast::FunctionReturnType::DataType(
+                sqlparser::ast::DataType::Custom(
+                    ObjectName(vec![sqlparser::ast::ObjectNamePart::Identifier(Ident {
+                        value: "SMALLDATETIME".to_string(),
+                        quote_style: None,
+                        span: Span {
+                            start: Location::new(2, 17),
+                            end: Location::new(2, 30)
+                        },
+                    })]),
+                    vec![]
+                )
             )),
             function_body: Some(CreateFunctionBody::AsBeginEnd(BeginEndStatements {
                 begin_token: AttachedToken(TokenWithSpan {
@@ -3262,6 +3264,7 @@ fn test_supports_statements_without_semicolon_delimiter() {
                 returning: None,
                 output: None,
                 or: None,
+                order_by: vec![],
                 limit: None,
             }),
         ]
@@ -3332,6 +3335,7 @@ fn test_supports_statements_without_semicolon_delimiter() {
                 returning: None,
                 output: None,
                 or: None,
+                order_by: vec![],
                 limit: None,
             }),
         ]

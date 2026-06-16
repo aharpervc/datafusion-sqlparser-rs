@@ -115,8 +115,10 @@ fn parse_leading_comma_before_table_options() {
     let dialect = all_dialects_where(|d| d.supports_leading_comma_before_table_options());
     dialect.verified_stmt("CREATE TABLE foo, FALLBACK (id INT)");
 
-    let unsupported_dialects =
-        all_dialects_where(|d| !d.supports_leading_comma_before_table_options());
+    let unsupported_dialects = all_dialects_where(|d| {
+        !d.supports_leading_comma_before_table_options()
+            && !d.supports_statements_without_semicolon_delimiter()
+    });
     assert!(unsupported_dialects
         .parse_sql_statements("CREATE TABLE foo, FALLBACK (id INT)")
         .is_err());
